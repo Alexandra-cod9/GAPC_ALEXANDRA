@@ -239,10 +239,10 @@ def mostrar_nuevo_prestamo_individual():
                 with col1:
                     monto_prestamo = st.number_input(
                         "💵 Monto a solicitar:",
-                        min_value=0.0,
+                        min_value=1.0,
                         max_value=float(maximo_permitido) if maximo_permitido > 0 else 999999.0,
-                        value=0.0,
-                        step=100.0,
+                        value=100.0,
+                        step=50.0,
                         help=f"Máximo recomendado: ${maximo_permitido:,.2f}",
                         key="monto_prestamo"
                     )
@@ -624,5 +624,6 @@ def mostrar_historial_pagos(id_prestamo):
 def registrar_pago_prestamo(id_prestamo):
     """Registra un pago para un préstamo"""
     st.info("🔧 Función de registro de pago en desarrollo...")
+
 
 
