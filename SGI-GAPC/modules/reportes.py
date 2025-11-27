@@ -52,7 +52,7 @@ def generar_reporte_mensual(mes_nombre, año):
             
             id_grupo = st.session_state.usuario.get('id_grupo', 1)
             
-            # CORRECCIÓN: Mapear nombres de meses en español a números
+            # Mapear nombres de meses en español a números
             meses_espanol = {
                 "Enero": 1, "Febrero": 2, "Marzo": 3, "Abril": 4,
                 "Mayo": 5, "Junio": 6, "Julio": 7, "Agosto": 8,
@@ -147,12 +147,11 @@ def generar_reporte_mensual(mes_nombre, año):
             total_prestamos_result = cursor.fetchone()
             total_prestamos = total_prestamos_result['total_prestamos'] or 0
             
-            # Total multas aplicadas
+            # Total multas aplicadas (CORREGIDO - SIN JOIN a tabla estado)
             cursor.execute("""
                 SELECT SUM(m.monto) as total_multas
                 FROM multa m
                 JOIN miembrogapc mb ON m.id_miembro = mb.id_miembro
-                JOIN estado e ON m.id_estado = e.id_estado
                 WHERE mb.id_grupo = %s AND m.fecha_registro BETWEEN %s AND %s
             """, (id_grupo, fecha_inicio, fecha_fin))
             
@@ -252,13 +251,12 @@ def generar_reporte_mensual(mes_nombre, año):
             else:
                 st.info("No hay préstamos aprobados en este periodo")
             
-            # MULTAS del mes
+            # MULTAS del mes (CORREGIDO - SIN JOIN a tabla estado)
             st.markdown("#### ⚖️ Multas Aplicadas")
             cursor.execute("""
-                SELECT m.motivo, m.monto, m.fecha_registro, mb.nombre, e.nombre_estado
+                SELECT m.motivo, m.monto, m.fecha_registro, mb.nombre
                 FROM multa m
                 JOIN miembrogapc mb ON m.id_miembro = mb.id_miembro
-                JOIN estado e ON m.id_estado = e.id_estado
                 WHERE mb.id_grupo = %s AND m.fecha_registro BETWEEN %s AND %s
                 ORDER BY m.monto DESC
             """, (id_grupo, fecha_inicio, fecha_fin))
@@ -268,8 +266,7 @@ def generar_reporte_mensual(mes_nombre, año):
             if multas:
                 st.metric("📊 Cantidad de Multas", len(multas))
                 for multa in multas:
-                    estado_color = "✅" if multa['nombre_estado'] == 'pagado' else "⏳"
-                    st.write(f"{estado_color} **{multa['nombre']}** - ${multa['monto']:,.2f} - {multa['motivo']} - {multa['nombre_estado']}")
+                    st.write(f"⚠️ **{multa['nombre']}** - ${multa['monto']:,.2f} - {multa['motivo']}")
             else:
                 st.info("No hay multas aplicadas en este periodo")
             
@@ -301,26 +298,25 @@ def generar_reporte_mensual(mes_nombre, año):
                     st.info("No hay datos de ahorro")
             
             with col2:
-                st.markdown("#### 📊 Socios con Multas Pendientes")
+                st.markdown("#### 📊 Socios con Multas Totales")
                 cursor.execute("""
-                    SELECT m.nombre, COUNT(*) as multas_pendientes
+                    SELECT m.nombre, COUNT(*) as cantidad_multas, SUM(mul.monto) as total_multas
                     FROM multa mul
                     JOIN miembrogapc m ON mul.id_miembro = m.id_miembro
-                    JOIN estado e ON mul.id_estado = e.id_estado
-                    WHERE m.id_grupo = %s AND e.nombre_estado IN ('activo', 'mora')
+                    WHERE m.id_grupo = %s
                     GROUP BY m.id_miembro, m.nombre
-                    HAVING multas_pendientes > 0
-                    ORDER BY multas_pendientes DESC
+                    HAVING cantidad_multas > 0
+                    ORDER BY total_multas DESC
                     LIMIT 5
                 """, (id_grupo,))
                 
-                multas_pendientes = cursor.fetchall()
+                socios_multas = cursor.fetchall()
                 
-                if multas_pendientes:
-                    for miembro in multas_pendientes:
-                        st.write(f"**{miembro['nombre']}** - {miembro['multas_pendientes']} multas pendientes")
+                if socios_multas:
+                    for miembro in socios_multas:
+                        st.write(f"**{miembro['nombre']}** - {miembro['cantidad_multas']} multas (${miembro['total_multas']:,.2f})")
                 else:
-                    st.info("No hay multas pendientes")
+                    st.info("No hay multas registradas")
             
             cursor.close()
             conexion.close()
@@ -334,6 +330,8 @@ def generar_reporte_mensual(mes_nombre, año):
             
     except Exception as e:
         st.error(f"❌ Error al generar reporte: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
 def obtener_conexion():
     """Función para obtener conexión a la base de datos"""
