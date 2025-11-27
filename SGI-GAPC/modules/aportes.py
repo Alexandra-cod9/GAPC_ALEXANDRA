@@ -236,7 +236,7 @@ def mostrar_estado_financiero_completo(miembro):
             f"${datos_financieros['multas_pendientes']:,.2f}",
             delta=f"-${datos_financieros['multas_pendientes']:,.2f}",
             delta_color="inverse",
-            help="Suma de todas las multas en estado 'activo' o 'mora'"
+            help="Suma de todas las multas registradas"
         )
     
     # Total de salidas
@@ -297,10 +297,10 @@ def mostrar_estado_financiero_completo(miembro):
             for multa in datos_financieros['detalle_multas']:
                 st.write(f"**#{multa['id_multa']}** - ${multa['monto']:,.2f}")
                 st.write(f"  📝 {multa['motivo']}")
-                st.write(f"  🔒 {multa['nombre_estado']}")
+                st.write(f"  📅 Registrada: {multa['fecha_registro']}")
                 st.write("---")
         else:
-            st.info("✅ No tiene multas pendientes")
+            st.info("✅ No tiene multas registradas")
     
     # SECCIÓN 5: DEBUG - Mostrar datos brutos (temporal para diagnóstico)
     with st.expander("🔍 Ver datos de debug (para diagnóstico)", expanded=False):
@@ -372,17 +372,15 @@ def obtener_datos_financieros_completos(id_miembro):
             # DEBUG: Mostrar préstamos
             st.write(f"💳 DEBUG: Préstamos pendientes: {len(prestamos_pendientes)}")
             
-            # 3. Obtener multas pendientes (SIN fecha_creacion)
+            # 3. Obtener multas pendientes (CORREGIDO - SIN JOIN a tabla estado)
             cursor.execute("""
                 SELECT 
                     mt.id_multa,
                     mt.motivo,
                     mt.monto,
-                    e.nombre_estado,
-                    mt.id_estado
+                    mt.fecha_registro
                 FROM multa mt
-                JOIN estado e ON mt.id_estado = e.id_estado
-                WHERE mt.id_miembro = %s AND e.nombre_estado IN ('activo', 'mora')
+                WHERE mt.id_miembro = %s
             """, (id_miembro,))
             
             multas_pendientes = cursor.fetchall()
