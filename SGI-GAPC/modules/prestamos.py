@@ -202,31 +202,33 @@ def mostrar_nuevo_prestamo_individual():
         # Buscar miembro - DEBE estar dentro del form
         miembro_seleccionado = buscar_miembro_prestamo()
         
+        # Inicializar todas las variables
         monto_prestamo = 0.0
         plazo_meses = 6
         proposito = ""
         fecha_solicitud = datetime.now()
         maximo_permitido = 0.0
+        fecha_vencimiento = datetime.now()
         
         if miembro_seleccionado:
             st.markdown("---")
             
-            # Calcular máximo permitido
-            maximo_permitido = miembro_seleccionado['ahorro_actual'] * 0.8  # 80% del ahorro
+            # Calcular máximo permitido SOLO si hay miembro seleccionado
+            maximo_permitido = float(miembro_seleccionado.get('ahorro_actual', 0)) * 0.8  # 80% del ahorro
             
             # Mostrar información del miembro
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.info(f"**👤 Miembro:** {miembro_seleccionado['nombre']}")
             with col2:
-                st.info(f"**💰 Ahorro Actual:** ${miembro_seleccionado['ahorro_actual']:,.2f}")
+                st.info(f"**💰 Ahorro Actual:** ${miembro_seleccionado.get('ahorro_actual', 0):,.2f}")
             with col3:
                 st.info(f"**📈 Máximo Recomendado:** ${maximo_permitido:,.2f}")
             
             # Verificar si el miembro puede solicitar préstamo
             if miembro_seleccionado.get('prestamos_activos', 0) > 0:
                 st.error("❌ Este miembro ya tiene un préstamo activo y no puede solicitar otro.")
-            elif miembro_seleccionado['ahorro_actual'] <= 0:
+            elif miembro_seleccionado.get('ahorro_actual', 0) <= 0:
                 st.error("❌ Este miembro no tiene ahorro suficiente para solicitar un préstamo.")
             else:
                 # Solo mostrar el formulario si el miembro es válido
@@ -238,7 +240,7 @@ def mostrar_nuevo_prestamo_individual():
                     monto_prestamo = st.number_input(
                         "💵 Monto a solicitar:",
                         min_value=0.0,
-                        max_value=float(maximo_permitido),
+                        max_value=float(maximo_permitido) if maximo_permitido > 0 else 999999.0,
                         value=0.0,
                         step=100.0,
                         help=f"Máximo recomendado: ${maximo_permitido:,.2f}",
@@ -303,7 +305,7 @@ def mostrar_nuevo_prestamo_individual():
                     - **Fecha de vencimiento:** {fecha_vencimiento.strftime('%d/%m/%Y')}
                     """)
         
-        # ✅ BOTÓN DE ENVÍO - SIEMPRE dentro del form
+        # ✅ BOTÓN DE ENVÍO - SIEMPRE debe estar presente en un form
         submitted = st.form_submit_button(
             "✅ Aprobar Préstamo", 
             use_container_width=True,
@@ -317,13 +319,13 @@ def mostrar_nuevo_prestamo_individual():
                 st.error("❌ Debes seleccionar un miembro")
             elif miembro_seleccionado.get('prestamos_activos', 0) > 0:
                 st.error("❌ Este miembro ya tiene un préstamo activo")
-            elif miembro_seleccionado['ahorro_actual'] <= 0:
+            elif miembro_seleccionado.get('ahorro_actual', 0) <= 0:
                 st.error("❌ Este miembro no tiene ahorro suficiente")
             elif monto_prestamo <= 0:
                 st.error("❌ El monto del préstamo debe ser mayor a 0")
-            elif not proposito:
+            elif not proposito or proposito.strip() == "":
                 st.error("❌ Debes especificar el motivo del préstamo")
-            elif monto_prestamo > maximo_permitido:
+            elif maximo_permitido > 0 and monto_prestamo > maximo_permitido:
                 st.error(f"❌ El monto excede el máximo permitido (${maximo_permitido:,.2f})")
             else:
                 # Todo validado correctamente, guardar préstamo
@@ -353,10 +355,10 @@ def buscar_miembro_prestamo():
                     m.id_miembro,
                     m.nombre,
                     m.telefono,
-                    COALESCE(SUM(a.monto), 0) as ahorro_actual,
-                    COUNT(p.id_prestamo) as prestamos_activos
+                    COALESCE(SUM(CASE WHEN a.tipo = 'Ahorro' THEN a.monto ELSE 0 END), 0) as ahorro_actual,
+                    COUNT(DISTINCT CASE WHEN p.estado = 'aprobado' THEN p.id_prestamo ELSE NULL END) as prestamos_activos
                 FROM miembrogapc m
-                LEFT JOIN aporte a ON m.id_miembro = a.id_miembro AND a.tipo = 'Ahorro'
+                LEFT JOIN aporte a ON m.id_miembro = a.id_miembro
                 LEFT JOIN prestamo p ON m.id_miembro = p.id_miembro AND p.estado = 'aprobado'
                 WHERE m.id_grupo = %s
                 GROUP BY m.id_miembro, m.nombre, m.telefono
@@ -372,12 +374,15 @@ def buscar_miembro_prestamo():
                 opciones = ["Selecciona un miembro"]
                 
                 for miembro in miembros:
-                    if miembro['prestamos_activos'] > 0:
+                    ahorro = float(miembro.get('ahorro_actual', 0))
+                    prestamos_act = int(miembro.get('prestamos_activos', 0))
+                    
+                    if prestamos_act > 0:
                         opciones.append(f"{miembro['id_miembro']} - {miembro['nombre']} (Ya tiene préstamo activo)")
-                    elif miembro['ahorro_actual'] <= 0:
+                    elif ahorro <= 0:
                         opciones.append(f"{miembro['id_miembro']} - {miembro['nombre']} (Sin ahorro suficiente)")
                     else:
-                        opciones.append(f"{miembro['id_miembro']} - {miembro['nombre']} (Ahorro: ${miembro['ahorro_actual']:,.2f})")
+                        opciones.append(f"{miembro['id_miembro']} - {miembro['nombre']} (Ahorro: ${ahorro:,.2f})")
                 
                 miembro_seleccionado_opcion = st.selectbox(
                     "👤 Selecciona el miembro solicitante:",
@@ -407,6 +412,19 @@ def guardar_prestamo_individual(miembro, monto, plazo_meses, proposito, fecha_so
         if conexion:
             cursor = conexion.cursor()
             
+            # Obtener la última reunión del grupo para usar como referencia
+            id_grupo = st.session_state.usuario.get('id_grupo', 1)
+            cursor.execute("""
+                SELECT id_reunion 
+                FROM reunion 
+                WHERE id_grupo = %s 
+                ORDER BY fecha DESC, hora DESC 
+                LIMIT 1
+            """, (id_grupo,))
+            
+            ultima_reunion = cursor.fetchone()
+            id_reunion = ultima_reunion['id_reunion'] if ultima_reunion else 1
+            
             # Insertar préstamo
             cursor.execute("""
                 INSERT INTO prestamo (
@@ -415,7 +433,7 @@ def guardar_prestamo_individual(miembro, monto, plazo_meses, proposito, fecha_so
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 miembro['id_miembro'],
-                1,  # Usar un id_reunion por defecto
+                id_reunion,
                 monto,
                 proposito,
                 fecha_solicitud,
@@ -447,6 +465,8 @@ def guardar_prestamo_individual(miembro, monto, plazo_meses, proposito, fecha_so
             
     except Exception as e:
         st.error(f"❌ Error al guardar préstamo: {e}")
+        import traceback
+        st.error(traceback.format_exc())
 
 def mostrar_prestamos_activos():
     """Muestra solo los préstamos activos"""
@@ -604,4 +624,5 @@ def mostrar_historial_pagos(id_prestamo):
 def registrar_pago_prestamo(id_prestamo):
     """Registra un pago para un préstamo"""
     st.info("🔧 Función de registro de pago en desarrollo...")
+
 
