@@ -237,12 +237,16 @@ def mostrar_nuevo_prestamo_individual():
                 col1, col2 = st.columns(2)
                 
                 with col1:
+                    # Calcular valor inicial seguro
+                    max_monto = float(maximo_permitido) if maximo_permitido > 0 else 999999.0
+                    valor_inicial = min(100.0, max_monto)  # Usar 100 o el máximo si es menor
+                    
                     monto_prestamo = st.number_input(
                         "💵 Monto a solicitar:",
                         min_value=1.0,
-                        max_value=float(maximo_permitido) if maximo_permitido > 0 else 999999.0,
-                        value=100.0,
-                        step=50.0,
+                        max_value=max_monto,
+                        value=valor_inicial,
+                        step=10.0,
                         help=f"Máximo recomendado: ${maximo_permitido:,.2f}",
                         key="monto_prestamo"
                     )
@@ -467,7 +471,7 @@ def guardar_prestamo_individual(miembro, monto, plazo_meses, proposito, fecha_so
         st.error(f"❌ Error al guardar préstamo: {e}")
         import traceback
         st.error(traceback.format_exc())
-
+        
 def mostrar_prestamos_activos():
     """Muestra solo los préstamos activos"""
     st.subheader("📊 Préstamos Activos")
@@ -624,6 +628,7 @@ def mostrar_historial_pagos(id_prestamo):
 def registrar_pago_prestamo(id_prestamo):
     """Registra un pago para un préstamo"""
     st.info("🔧 Función de registro de pago en desarrollo...")
+
 
 
 
