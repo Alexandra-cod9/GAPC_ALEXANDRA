@@ -131,6 +131,8 @@ def mostrar_configuracion_grupo():
 
 def obtener_informacion_grupo():
     """Obtiene la información actual del grupo"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -146,14 +148,12 @@ def obtener_informacion_grupo():
                     frecuencia_reuniones,
                     tasa_interes_mensual,
                     metodo_reparto_utilidades,
-                    COALESCE(meta_social, '') as meta_social
+                    meta_social
                 FROM grupo 
                 WHERE id_grupo = %s
             """, (id_grupo,))
             
             grupo = cursor.fetchone()
-            cursor.close()
-            conexion.close()
             
             if grupo:
                 return {
@@ -169,6 +169,12 @@ def obtener_informacion_grupo():
     except Exception as e:
         st.error(f"❌ Error al obtener información del grupo: {e}")
     
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
+    
     # Valores por defecto
     return {
         'nombre_grupo': "Mi Grupo GAPC",
@@ -182,6 +188,8 @@ def obtener_informacion_grupo():
 
 def guardar_informacion_grupo(nombre, comunidad, fecha, frecuencia, tasa_interes, metodo_reparto, meta_social):
     """Guarda la información del grupo en la base de datos"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -189,39 +197,31 @@ def guardar_informacion_grupo(nombre, comunidad, fecha, frecuencia, tasa_interes
             
             id_grupo = st.session_state.usuario.get('id_grupo', 1)
             
-            # Verificar si el grupo ya existe
-            cursor.execute("SELECT id_grupo FROM grupo WHERE id_grupo = %s", (id_grupo,))
-            grupo_existente = cursor.fetchone()
-            
-            if grupo_existente:
-                # Actualizar grupo existente
-                cursor.execute("""
-                    UPDATE grupo SET
-                        nombre_grupo = %s,
-                        nombre_comunidad = %s,
-                        fecha_formacion = %s,
-                        frecuencia_reuniones = %s,
-                        tasa_interes_mensual = %s,
-                        metodo_reparto_utilidades = %s,
-                        meta_social = %s
-                    WHERE id_grupo = %s
-                """, (nombre, comunidad, fecha, frecuencia, tasa_interes, metodo_reparto, meta_social, id_grupo))
-            else:
-                # Insertar nuevo grupo - CORREGIDO: necesita id_distrito e id_reglamento
-                st.warning("⚠️ Para crear un nuevo grupo, primero debes configurar la ubicación y el reglamento")
-                cursor.close()
-                conexion.close()
-                return
+            # Actualizar grupo existente
+            cursor.execute("""
+                UPDATE grupo SET
+                    nombre_grupo = %s,
+                    nombre_comunidad = %s,
+                    fecha_formacion = %s,
+                    frecuencia_reuniones = %s,
+                    tasa_interes_mensual = %s,
+                    metodo_reparto_utilidades = %s,
+                    meta_social = %s
+                WHERE id_grupo = %s
+            """, (nombre, comunidad, fecha, frecuencia, tasa_interes, metodo_reparto, meta_social, id_grupo))
             
             conexion.commit()
-            cursor.close()
-            conexion.close()
-            
             st.success("🎉 ¡Información del grupo guardada exitosamente!")
             st.balloons()
             
     except Exception as e:
         st.error(f"❌ Error al guardar información del grupo: {e}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
 
 def mostrar_configuracion_ubicacion():
     """Configuración de la ubicación del grupo"""
@@ -295,6 +295,8 @@ def mostrar_configuracion_ubicacion():
 
 def obtener_ubicacion_actual():
     """Obtiene la ubicación actual del grupo"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -323,8 +325,6 @@ def obtener_ubicacion_actual():
                 """, (grupo['id_distrito'],))
                 
                 ubicacion = cursor.fetchone()
-                cursor.close()
-                conexion.close()
                 
                 if ubicacion:
                     return {
@@ -332,33 +332,43 @@ def obtener_ubicacion_actual():
                         'id_municipio': ubicacion['id_municipio'],
                         'id_departamento': ubicacion['id_departamento']
                     }
-            
-            cursor.close()
-            conexion.close()
     
     except Exception as e:
         st.error(f"❌ Error al obtener ubicación: {e}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
     
     return {'id_departamento': None, 'id_municipio': None, 'id_distrito': None}
 
 def obtener_departamentos():
     """Obtiene la lista de departamentos"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
             cursor = conexion.cursor()
             cursor.execute("SELECT id_departamento, nombre_departamento FROM departamento ORDER BY nombre_departamento")
             departamentos = cursor.fetchall()
-            cursor.close()
-            conexion.close()
             return departamentos
     except Exception as e:
         st.error(f"❌ Error al cargar departamentos: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
     
     return []
 
 def obtener_municipios(id_departamento):
     """Obtiene municipios por departamento"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -370,16 +380,21 @@ def obtener_municipios(id_departamento):
                 ORDER BY nombre_municipio
             """, (id_departamento,))
             municipios = cursor.fetchall()
-            cursor.close()
-            conexion.close()
             return municipios
     except Exception as e:
         st.error(f"❌ Error al cargar municipios: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
     
     return []
 
 def obtener_distritos(id_municipio):
     """Obtiene distritos por municipio"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -391,11 +406,14 @@ def obtener_distritos(id_municipio):
                 ORDER BY nombre_distrito
             """, (id_municipio,))
             distritos = cursor.fetchall()
-            cursor.close()
-            conexion.close()
             return distritos
     except Exception as e:
         st.error(f"❌ Error al cargar distritos: {e}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
     
     return []
 
@@ -428,6 +446,8 @@ def obtener_indice_distrito(distritos, id_distrito):
 
 def guardar_ubicacion_grupo(id_distrito):
     """Guarda la ubicación del grupo"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -442,11 +462,15 @@ def guardar_ubicacion_grupo(id_distrito):
             """, (id_distrito, id_grupo))
             
             conexion.commit()
-            cursor.close()
-            conexion.close()
             
     except Exception as e:
         st.error(f"❌ Error al guardar ubicación: {e}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
 
 def mostrar_configuracion_reglamento():
     """Configuración del reglamento del grupo"""
@@ -491,11 +515,21 @@ def mostrar_configuracion_reglamento():
         )
         
         if st.form_submit_button("💾 Guardar Reglamento", use_container_width=True):
-            guardar_reglamento(texto_reglamento, tipo_multa, reglas_prestamo)
-            st.success("🎉 ¡Reglamento guardado exitosamente!")
+            # Validar que no estén vacíos
+            if not texto_reglamento.strip():
+                st.error("❌ El texto del reglamento no puede estar vacío")
+            elif not tipo_multa.strip():
+                st.error("❌ Los tipos de multa no pueden estar vacíos")
+            elif not reglas_prestamo.strip():
+                st.error("❌ Las reglas de préstamo no pueden estar vacías")
+            else:
+                guardar_reglamento(texto_reglamento.strip(), tipo_multa.strip(), reglas_prestamo.strip())
+                st.success("🎉 ¡Reglamento guardado exitosamente!")
 
 def obtener_reglamento_actual():
     """Obtiene el reglamento actual del grupo"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -509,29 +543,31 @@ def obtener_reglamento_actual():
             if grupo and grupo['id_reglamento']:
                 cursor.execute("""
                     SELECT 
-                        COALESCE(texto_reglamento, '') as texto_reglamento,
-                        COALESCE(tipo_multa, '') as tipo_multa,
-                        COALESCE(reglas_prestamo, '') as reglas_prestamo
+                        texto_reglamento,
+                        tipo_multa,
+                        reglas_prestamo
                     FROM reglamento 
                     WHERE id_reglamento = %s
                 """, (grupo['id_reglamento'],))
                 
                 reglamento = cursor.fetchone()
-                cursor.close()
-                conexion.close()
                 
                 if reglamento:
                     return {
-                        'texto_reglamento': reglamento['texto_reglamento'],
-                        'tipo_multa': reglamento['tipo_multa'],
-                        'reglas_prestamo': reglamento['reglas_prestamo']
+                        'texto_reglamento': reglamento['texto_reglamento'] or "",
+                        'tipo_multa': reglamento['tipo_multa'] or "",
+                        'reglas_prestamo': reglamento['reglas_prestamo'] or ""
                     }
-            
-            cursor.close()
-            conexion.close()
     
     except Exception as e:
         st.error(f"❌ Error al obtener reglamento: {e}")
+    
+    finally:
+        # Cerrar recursos en el orden correcto
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
     
     return {
         'texto_reglamento': "",
@@ -541,6 +577,8 @@ def obtener_reglamento_actual():
 
 def guardar_reglamento(texto_reglamento, tipo_multa, reglas_prestamo):
     """Guarda el reglamento en la base de datos"""
+    conexion = None
+    cursor = None
     try:
         conexion = obtener_conexion()
         if conexion:
@@ -579,11 +617,15 @@ def guardar_reglamento(texto_reglamento, tipo_multa, reglas_prestamo):
                 """, (id_reglamento, id_grupo))
             
             conexion.commit()
-            cursor.close()
-            conexion.close()
             
     except Exception as e:
         st.error(f"❌ Error al guardar reglamento: {e}")
+    
+    finally:
+        if cursor:
+            cursor.close()
+        if conexion:
+            conexion.close()
 
 def mostrar_configuracion_avanzada():
     """Configuración avanzada del sistema"""
