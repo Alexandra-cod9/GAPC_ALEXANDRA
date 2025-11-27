@@ -116,39 +116,39 @@ def mostrar_nuevo_prestamo_individual():
                     - **Fecha de vencimiento:** {fecha_vencimiento.strftime('%d/%m/%Y')}
                     """)
         
-        # ✅ BOTÓN DE ENVÍO - SIEMPRE dentro del form
+        # ✅ BOTÓN DE ENVÍO - SIEMPRE dentro del form y SIEMPRE habilitado
         submitted = st.form_submit_button(
             "✅ Aprobar Préstamo", 
             use_container_width=True,
             type="primary"
         )
-        
-        # Procesar cuando se envía el formulario
-        if submitted:
-            # Validaciones
-            if not miembro_seleccionado:
-                st.error("❌ Debes seleccionar un miembro")
-            elif miembro_seleccionado.get('prestamos_activos', 0) > 0:
-                st.error("❌ Este miembro ya tiene un préstamo activo")
-            elif miembro_seleccionado['ahorro_actual'] <= 0:
-                st.error("❌ Este miembro no tiene ahorro suficiente")
-            elif monto_prestamo <= 0:
-                st.error("❌ El monto del préstamo debe ser mayor a 0")
-            elif not proposito:
-                st.error("❌ Debes especificar el motivo del préstamo")
-            elif monto_prestamo > maximo_permitido:
-                st.error(f"❌ El monto excede el máximo permitido (${maximo_permitido:,.2f})")
-            else:
-                # Todo validado correctamente, guardar préstamo
-                fecha_vencimiento = fecha_solicitud + relativedelta(months=plazo_meses)
-                guardar_prestamo_individual(
-                    miembro_seleccionado, 
-                    monto_prestamo, 
-                    plazo_meses, 
-                    proposito, 
-                    fecha_solicitud,
-                    fecha_vencimiento
-                )
+    
+    # Procesar FUERA del form cuando se envía
+    if submitted:
+        # Validaciones
+        if not miembro_seleccionado:
+            st.error("❌ Debes seleccionar un miembro")
+        elif miembro_seleccionado.get('prestamos_activos', 0) > 0:
+            st.error("❌ Este miembro ya tiene un préstamo activo")
+        elif miembro_seleccionado['ahorro_actual'] <= 0:
+            st.error("❌ Este miembro no tiene ahorro suficiente")
+        elif monto_prestamo <= 0:
+            st.error("❌ El monto del préstamo debe ser mayor a 0")
+        elif not proposito:
+            st.error("❌ Debes especificar el motivo del préstamo")
+        elif monto_prestamo > maximo_permitido:
+            st.error(f"❌ El monto excede el máximo permitido (${maximo_permitido:,.2f})")
+        else:
+            # Todo validado correctamente, guardar préstamo
+            fecha_vencimiento = fecha_solicitud + relativedelta(months=plazo_meses)
+            guardar_prestamo_individual(
+                miembro_seleccionado, 
+                monto_prestamo, 
+                plazo_meses, 
+                proposito, 
+                fecha_solicitud,
+                fecha_vencimiento
+            )
 
 
 def buscar_miembro_prestamo():
